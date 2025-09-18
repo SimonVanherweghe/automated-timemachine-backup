@@ -22,6 +22,26 @@ I have a USB disk for Time Machine backups that is plugged in to my external mon
 - `launchctl load` seems to be deprecated
 - Got it finally up and running with <https://www.soma-zone.com/LaunchControl/>
 
+## Commands
+
+Find the UUID of your Time Machine disk:
+
+```bash
+diskutil list
+```
+
+or
+
+```bash
+mount | egrep '^/dev/' | sed -e 's# (.*#)#g' -e 's# on /# (/#g'
+```
+
+test run:
+
+```bash
+/usr/local/bin/timemachine-mount-run-unmount.sh
+```
+
 ## Resources
 
 <https://talk.macpowerusers.com/t/any-way-to-automate-a-time-machine-backup-mount-backup-unmount/16758/10>

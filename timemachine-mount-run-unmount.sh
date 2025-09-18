@@ -27,7 +27,7 @@
 	#
 	# or whatever is correct for your Time Machine drive
 
-DEVICE='/dev/disk3s2'
+DEVICE='/dev/disk5s2'
 
 ################################################################################################
 
