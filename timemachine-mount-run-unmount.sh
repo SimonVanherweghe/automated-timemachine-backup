@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh -f
+#!/bin/zsh -f
 
 # goes to: /usr/local/bin/timemachine-mount-run-unmount.sh
 
@@ -27,7 +27,7 @@
 	#
 	# or whatever is correct for your Time Machine drive
 
-DEVICE='/dev/disk5s2'
+DEVICE='/dev/disk5s1'
 
 ################################################################################################
 
