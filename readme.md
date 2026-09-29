@@ -42,6 +42,29 @@ test run:
 /usr/local/bin/timemachine-mount-run-unmount.sh
 ```
 
+## Encrypted backup disk
+
+If "Encrypt backups" is on, the script unlocks the disk with a password from your login keychain. Store it once (it prompts for the password):
+
+```bash
+security add-generic-password -s timemachine-mount-run-unmount -a 2TBSanDsik -w
+```
+
+## Troubleshooting
+
+"Total copied: 0.00 MB" means Time Machine refused the backup (`tmutil startbackup` still exits 0). Find the reason in the logs (use `/usr/bin/log`, `log` is a zsh builtin):
+
+```bash
+/usr/bin/log show --last 1h --style compact --predicate 'subsystem == "com.apple.TimeMachine" AND eventMessage CONTAINS "Backup failed"'
+```
+
+`BACKUP_FAILED_TARGETVOL_DISK_FULL` means the backup disk needs more than 100 GB free. Check with `diskutil apfs list`, then delete old backups:
+
+```bash
+tmutil listbackups
+sudo tmutil delete -d /Volumes/2TBSanDsik -t <timestamp>
+```
+
 ## Resources
 
 <https://talk.macpowerusers.com/t/any-way-to-automate-a-time-machine-backup-mount-backup-unmount/16758/10>

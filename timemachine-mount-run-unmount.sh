@@ -2,32 +2,16 @@
 
 # goes to: /usr/local/bin/timemachine-mount-run-unmount.sh
 
-# Purpose: 	Once you set the DEVICE,
-#			this script will mount your Time Machine drive,
+# Purpose: 	This script will mount your Time Machine drive,
 #			run Time Machine,
 #			and then unmount the drive
 #
 # From:	Timothy J. Luoma
 # Mail:	luomat at gmail dot com
 # Date:	2020-04-20
-
-	## To find the device, mount the Time Machine drive and then run this command in Terminal:
-	#
-	#	mount | egrep '^/dev/' | sed -e 's# (.*#)#g' -e 's# on /# (/#g'
-	#
-	# and you will see a bunch of entries like this
-	#
-	#	/dev/disk2s1 (/Volumes/MBA-Clone - Data)
-	#	/dev/disk3s5 (/Volumes/Storage)
-	# 	/dev/disk4s6 (/Volumes/MBA-Clone)
-	#
-	# You need to set
-	#
-	#	DEVICE='/dev/disk3s5'
-	#
-	# or whatever is correct for your Time Machine drive
-
-DEVICE='/dev/disk5s1'
+#
+# The device is looked up by the Time Machine destination name on every run,
+# because disk identifiers (disk5s1, disk5s2, ...) change after an erase or replug.
 
 ################################################################################################
 
@@ -68,13 +52,32 @@ then
 else
 
 
+	DEVICE=$(diskutil info "$TM_DRIVE_NAME" 2>/dev/null | awk '/Device Identifier:/ {print $3}')
+
 	if [[ "$DEVICE" == "" ]]
 	then
-		echo "$NAME: the 'DEVICE' variable is not set" >>/dev/stderr
-		exit 0
+		echo "$NAME: could not find a disk for '$TM_DRIVE_NAME'. Is it connected?" >>/dev/stderr
+		exit 1
 	fi
 
-	diskutil mountDisk "$DEVICE"
+		# an encrypted backup disk has to be unlocked first; the password is read from the login keychain
+		# store it once with: security add-generic-password -s "$NAME" -a "<drive name>" -w
+	if diskutil info "$DEVICE" | egrep -q '^ *Locked: *Yes'
+	then
+		PASSPHRASE=$(security find-generic-password -s "$NAME" -a "$TM_DRIVE_NAME" -w 2>/dev/null)
+
+		if [[ "$PASSPHRASE" == "" ]]
+		then
+			echo "$NAME: '$TM_DRIVE_NAME' is encrypted, but no password was found in the keychain (service '$NAME', account '$TM_DRIVE_NAME')." >>/dev/stderr
+			exit 1
+		fi
+
+		print -r -- "$PASSPHRASE" | diskutil apfs unlockVolume "$DEVICE" -stdinpassphrase
+
+		unset PASSPHRASE
+	fi
+
+	[[ -d "$MNTPNT" ]] || diskutil mountDisk "$DEVICE"
 
 fi
 
@@ -87,6 +90,12 @@ fi
 
 TM_DRIVE_ID=$(tmutil destinationinfo | egrep '^ID  ' | sed 's#^ID  *: ##g' | head -1)
 
+	# `tmutil startbackup --block` exits 0 even when backupd refuses the backup
+	# (e.g. disk full), so compare the latest backup before and after instead
+BEFORE=$(tmutil latestbackup 2>/dev/null)
+
+LOG_START=$(strftime "%Y-%m-%d %H:%M:%S" "$EPOCHSECONDS")
+
 echo "$NAME: Starting backup at `timestamp`"
 
 	# `caffeinate -i` is optional but keeps your Mac from sleeping
@@ -94,13 +103,28 @@ caffeinate -i tmutil startbackup --block --destination "$TM_DRIVE_ID"
 
 EXIT="$?"
 
-if [[ "$EXIT" == "0" ]]
+AFTER=$(tmutil latestbackup 2>/dev/null)
+
+if [[ "$EXIT" == "0" && -n "$AFTER" && "$AFTER" != "$BEFORE" ]]
 then
 	echo "$NAME: Finished successfully at `timestamp`."
 
+	RESULT=0
+
 else
 
-	echo "$NAME: Finished UN-successfully (Exit = $EXIT) at `timestamp`."
+		# full path: `log` is a zsh builtin
+	REASON=$(/usr/bin/log show --start "$LOG_START" --style compact \
+		--predicate 'subsystem == "com.apple.TimeMachine" AND eventMessage CONTAINS "Backup failed"' \
+		2>/dev/null | grep 'Backup failed' | tail -1 | sed 's#.*Backup failed: ##')
+
+	[[ "$REASON" == "" ]] && REASON="no new backup was created"
+
+	echo "$NAME: Finished UN-successfully (Exit = $EXIT, Reason = $REASON) at `timestamp`." >>/dev/stderr
+
+	osascript -e "display notification \"$REASON\" with title \"Time Machine backup failed\""
+
+	RESULT=1
 
 fi
 
@@ -115,5 +139,5 @@ do
 
 done
 
-exit 0
+exit "$RESULT"
 #EOF
