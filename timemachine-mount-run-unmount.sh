@@ -85,7 +85,10 @@ if [[ ! -d "$MNTPNT" ]]
 then
 
 	echo "$NAME: Failed to mount '$MNTPNT'." >>/dev/stderr
-	exit 0
+
+	osascript -e "display notification \"Failed to mount $TM_DRIVE_NAME\" with title \"Time Machine backup failed\""
+
+	exit 1
 fi
 
 TM_DRIVE_ID=$(tmutil destinationinfo | egrep '^ID  ' | sed 's#^ID  *: ##g' | head -1)
