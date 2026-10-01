@@ -50,6 +50,13 @@ If "Encrypt backups" is on, the script unlocks the disk with a password from you
 security add-generic-password -s timemachine-mount-run-unmount -a 2TBSanDsik -w
 ```
 
+⚠️ This only works when you run the script from Terminal. With an encrypted disk I ran into two problems, so I went back to an unencrypted disk:
+
+- The scheduled (launchd) run can't unlock the disk: `Error unlocking APFS Volume: This operation is restricted by Sandbox (-69464)`. It would need Full Disk Access for `/bin/zsh`.
+- The `noauto` line in fstab doesn't stop the password popup when you plug in the disk. Entering the password mounts it.
+
+When you add the disk in Time Machine, "Encrypt Backup" is on by default.
+
 ## Troubleshooting
 
 "Total copied: 0.00 MB" means Time Machine refused the backup (`tmutil startbackup` still exits 0). Find the reason in the logs (use `/usr/bin/log`, `log` is a zsh builtin):
